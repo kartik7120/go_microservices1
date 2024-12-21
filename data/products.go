@@ -4,17 +4,20 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"regexp"
+
+	"github.com/go-playground/validator/v10"
 )
 
 type Product struct {
 	ID        int     `json:"id"`
-	Name      string  `json:"name"`
+	Name      string  `json:"name" validate:"required"`
 	Desc      string  `json:"desc"`
-	Price     float32 `json:"price"`
-	SKU       string  `json:"sku"` // what is SKU? Stock Keeping Unit - a unique identifier for each distinct product and service that can be purchased.
-	CreatedOn string  `json:"-"`   // "-" means that this field will not be marshalled or unmarshalled from JSON. what does marshalling and unmarshalling mean? Marshalling is the process of transforming the memory representation of an object to a data format suitable for storage or transmission. Unmarshalling is the reverse process.
-	UpdatedOn string  `json:"-"`   // "-" means that this field will not be marshalled or unmarshalled from JSON
-	DeletedOn string  `json:"-"`   // "-" means that this field will not be marshalled or unmarshalled from JSON
+	Price     float32 `json:"price" validate:"gt=0"`
+	SKU       string  `json:"sku" validate:"required,sku"` // what is SKU? Stock Keeping Unit - a unique identifier for each distinct product and service that can be purchased.
+	CreatedOn string  `json:"-"`                           // "-" means that this field will not be marshalled or unmarshalled from JSON. what does marshalling and unmarshalling mean? Marshalling is the process of transforming the memory representation of an object to a data format suitable for storage or transmission. Unmarshalling is the reverse process.
+	UpdatedOn string  `json:"-"`                           // "-" means that this field will not be marshalled or unmarshalled from JSON
+	DeletedOn string  `json:"-"`                           // "-" means that this field will not be marshalled or unmarshalled from JSON
 }
 
 type Products []*Product
@@ -96,4 +99,23 @@ func (p *Products) ToJSON(w io.Writer) error {
 func (p *Product) FromJSON(w io.Reader) error {
 	d := json.NewDecoder(w)
 	return d.Decode(p)
+}
+
+func validateSKU(fl validator.FieldLevel) bool {
+	// SKU is of format abc-abc-abc
+
+	re := regexp.MustCompile(`[a-z]+-[a-z]+-[a-z]+`)
+	matches := re.FindAllString(fl.Field().String(), -1)
+
+	if len(matches) != 1 {
+		return false
+	}
+
+	return true
+}
+
+func (p *Product) Validate() error {
+	validate := validator.New()
+	validate.RegisterValidation("sku", validateSKU)
+	return validate.Struct(p)
 }
